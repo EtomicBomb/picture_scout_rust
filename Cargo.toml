@@ -1,0 +1,9 @@
+[package]
+name = "picture_scout"
+version = "0.1.0"
+authors = ["EtomicBomb <ethan@ethan.ws>"]
+edition = "2018"
+
+[dependencies]
+png = "0.14.1"
+rulinalg = "0.4.2"
