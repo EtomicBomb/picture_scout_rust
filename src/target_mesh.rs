@@ -1,4 +1,4 @@
-use std::cmp::{max, min};
+use std::cmp::{max, min, Reverse};
 
 use crate::target::{Target};
 use crate::boolean_matrix::BooleanMatrix;
@@ -36,7 +36,7 @@ impl TargetMesh {
             .cloned()
             .collect();
 
-        aligners.sort_by_key(|t| t.pixels_filled);
+        aligners.sort_by_key(|t| Reverse(t.pixels_filled));
         aligners.truncate(4);
 
         assert_eq!(aligners.len(), 4);
