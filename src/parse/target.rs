@@ -1,12 +1,12 @@
-use crate::image::Color;
+use crate::parse::image::Color;
 
 const ALIGNER_COLOR: Color = Color::red();
 const VERTICAL_BAR_COLOR: Color = Color::blue();
 const HORIZONTAL_BAR_COLOR: Color = Color::magenta();
 const DEBUG_TARGET_COLOR: Color = Color::green();
 
-const ALIGNER_FULLNESS: f64 = 0.41;
-const BAR_FULLNESS: f64 = 0.9;
+const ALIGNER_FULLNESS: f64 = 0.39;
+const BAR_FULLNESS: f64 = 0.84;
 const FULLNESS_TOLERANCE: f64 = 0.2;
 const TARGET_MIN_AREA: usize = 1000;
 const TARGET_MAX_AREA: usize = 100_000;
@@ -36,6 +36,25 @@ impl Target {
             mean_y,
             kind: TargetKind::classify(top, bottom, right, left, pixels_filled)?
         })
+    }
+
+    pub fn is_bar(&self) -> bool {
+        match self.kind {
+            TargetKind::HorizontalBar => true,
+            TargetKind::VerticalBar => true,
+            _ => false,
+        }
+    }
+
+    pub fn mean_position(&self) -> (f64, f64) {
+        fn mean(a: usize, b: usize) -> f64 {
+            (a as f64 + b as f64)/2.0
+        }
+
+        let mean_x = mean(self.left, self.right);
+        let mean_y = mean(self.top, self.bottom);
+
+        (mean_x, mean_y)
     }
 
     pub fn is_aligner(&self) -> bool {

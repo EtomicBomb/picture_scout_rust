@@ -1,18 +1,19 @@
 use std::cmp::{max, min, Reverse};
 
-use crate::target::{Target};
-use crate::boolean_matrix::BooleanMatrix;
-use crate::image::{Image, Color};
+
+use crate::parse::boolean_matrix::BooleanMatrix;
+use crate::parse::image::{Image, Color};
+use crate::parse::target::Target;
 
 
 pub struct TargetMesh {
-    inner: Vec<Target>,
+    pub targets: Vec<Target>,
 }
 
 
 impl TargetMesh {
     pub fn add_to_image(&self, image: &mut Image) {
-        for target in self.inner.iter() {
+        for target in self.targets.iter() {
             let color = target.get_color();
 
             for x in target.left..=target.right {
@@ -31,7 +32,7 @@ impl TargetMesh {
 
 
     pub fn get_aligner_centers(&self) -> Vec<(f64, f64)> {
-        let mut aligners: Vec<Target> = self.inner.iter()
+        let mut aligners: Vec<Target> = self.targets.iter()
             .filter(|t| t.is_aligner())
             .cloned()
             .collect();
@@ -75,7 +76,7 @@ impl TargetMesh {
             }
         }
 
-        TargetMesh { inner: targets }
+        TargetMesh { targets }
     }
 }
 

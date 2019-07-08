@@ -1,4 +1,4 @@
-use crate::image::{Image};
+use crate::parse::image::{Image};
 
 pub struct BooleanMatrix {
     data: Vec<bool>,
@@ -59,7 +59,7 @@ impl BooleanMatrix {
         Image::from_raw(image_data, self.width, self.height)
     }
 
-    pub fn get_index(&self, x: usize, y: usize) -> usize {
+    fn get_index(&self, x: usize, y: usize) -> usize {
         y*self.width + x
     }
 }
