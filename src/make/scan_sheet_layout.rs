@@ -1,32 +1,38 @@
-use crate::make::scan_sheet_elements::{ScanSheetElements, ElementKind, DOCUMENT_BASE, DOCUMENT_HEIGHT, BAR_WIDTH, BAR_LENGTH, FIELD_FONT_SIZE, ALIGNER_OUTER_RADIUS};
+use crate::make::scan_sheet_elements::{ScanSheetElements, ElementKind, BAR_WIDTH, BAR_LENGTH, FIELD_FONT_SIZE, ALIGNER_OUTER_RADIUS};
 use crate::make::scan_sheet_elements::Element;
 use svg;
 use std::collections::{HashSet};
-use crate::parse::TargetsFound;
+use crate::parse::BarsFound;
 
 const TEXT_WIDTH_MULTIPLIER: f64 = 0.6; // characters are how many times wider than they are tall
-const TEXT_GAP: f64 = 5.0; // how many pixels between the end of the text and the start of the field
+const TEXT_GAP: f64 = 0.02; // how many pixels between the end of the text and the start of the field
 
-const FIELD_START_X: f64 = 20.0;
+const FIELD_START_X: f64 = 0.2;
 
-pub const ALIGNER_DISTANCE_FROM_CORNER: f64 = 3.0;
+pub const ALIGNER_DISTANCE_FROM_CORNER: f64 = 0.05;
 
-const BAR_DISTANCE_THRESHOLD: f64 = 5.0; // TODO: fine tune this value
+const BAR_DISTANCE_THRESHOLD: f64 = 0.01;
 
-const TITLE_X: f64 = 30.0;
-const TITLE_Y: f64 = 10.0;
+const TITLE_X: f64 = 0.3;
+const TITLE_Y: f64 = 0.05;
 
-const SEGMENT_SPACE: f64 = 0.3; //
+const DIGIT_GAP: f64 = BAR_LENGTH; // the gap between seven segment display digits
+const BAR_SPACE: f64 = 0.003; //
+
+const VERTICAL_FIELD_START: f64 = 0.3;
+const VERTICAL_FIELD_SPACE: f64 = 0.1;
+const BAR_VERTICAL_OFFSET: f64 = 0.03;
+const SEVEN_SEGMENT_DISPLAY_OFFSET: f64 = 0.0;
 
 // describes offset from the top left of the digit
 const SEVEN_SEGMENT_BAR_OFFSETS: [(f64, f64, bool); 7] = [ // (x, y, is_horizontal)
-    (BAR_WIDTH+1.0*SEGMENT_SPACE, 0.0, true), // top
-    (BAR_WIDTH+BAR_LENGTH+2.0*SEGMENT_SPACE, BAR_WIDTH+SEGMENT_SPACE, false),
-    (BAR_WIDTH+BAR_LENGTH+2.0*SEGMENT_SPACE, 2.0*BAR_WIDTH+BAR_LENGTH+3.0*SEGMENT_SPACE, false),
-    (BAR_WIDTH+SEGMENT_SPACE, 2.0*BAR_WIDTH+2.0*BAR_LENGTH+4.0*SEGMENT_SPACE, true), // bottom
-    (0.0, 2.0*BAR_WIDTH+BAR_LENGTH+3.0*SEGMENT_SPACE, false),
-    (0.0, BAR_WIDTH+SEGMENT_SPACE, false),
-    (BAR_WIDTH+SEGMENT_SPACE, BAR_WIDTH+BAR_LENGTH+2.0*SEGMENT_SPACE, true), // middle section
+    (BAR_WIDTH+BAR_SPACE, 0.0, true), // top
+    (BAR_WIDTH+BAR_LENGTH+2.0* BAR_SPACE, BAR_WIDTH+ BAR_SPACE, false),
+    (BAR_WIDTH+BAR_LENGTH+2.0* BAR_SPACE, 2.0*BAR_WIDTH+BAR_LENGTH+3.0* BAR_SPACE, false),
+    (BAR_WIDTH+ BAR_SPACE, 2.0*BAR_WIDTH+2.0*BAR_LENGTH+4.0* BAR_SPACE, true), // bottom
+    (0.0, 2.0*BAR_WIDTH+BAR_LENGTH+3.0* BAR_SPACE, false),
+    (0.0, BAR_WIDTH+ BAR_SPACE, false),
+    (BAR_WIDTH+ BAR_SPACE, BAR_WIDTH+BAR_LENGTH+2.0* BAR_SPACE, true), // middle section
 ];
 
 
@@ -42,7 +48,7 @@ impl HighLevelPageDescription {
         let mut id_generator = BarIdGenerator::new();
         let mut layout = PageLayout::new(self.document_title.clone());
 
-        let mut current_y = 30.0;
+        let mut current_y = VERTICAL_FIELD_START;
 
         for field in self.fields.iter() {
 
@@ -51,14 +57,14 @@ impl HighLevelPageDescription {
 
             let new_entry = match field.kind {
                 HighLevelKind::Boolean =>
-                    LayoutEntry::Boolean(Bar::new(text_x_offset, current_y+3.0, true, &mut id_generator)),
+                    LayoutEntry::Boolean(Bar::new(text_x_offset, current_y+BAR_VERTICAL_OFFSET, true, &mut id_generator)),
                 HighLevelKind::SevenSegmentDisplay(digit_count) =>
-                    LayoutEntry::SevenSegmentDisplay(SevenSegmentDisplay::new(text_x_offset, current_y-6.0, digit_count, &mut id_generator)),
+                    LayoutEntry::SevenSegmentDisplay(SevenSegmentDisplay::new(text_x_offset, current_y+SEVEN_SEGMENT_DISPLAY_OFFSET, digit_count, &mut id_generator)),
             };
 
             layout.add_entry(new_entry, field.descriptor.clone(), FIELD_START_X, current_y);
 
-            current_y += 20.0;
+            current_y += VERTICAL_FIELD_SPACE;
         }
 
         layout
@@ -114,18 +120,18 @@ impl PageLayout {
             kind: ElementKind::Aligner,
         });
         elements.add_element(Element { // top right
-            x: DOCUMENT_BASE-2.0*ALIGNER_OUTER_RADIUS-ALIGNER_DISTANCE_FROM_CORNER,
+            x: 1.0-2.0*ALIGNER_OUTER_RADIUS-ALIGNER_DISTANCE_FROM_CORNER,
             y: ALIGNER_DISTANCE_FROM_CORNER,
             kind: ElementKind::Aligner,
         });
         elements.add_element(Element { // bottom right
-            x: DOCUMENT_BASE-2.0*ALIGNER_OUTER_RADIUS-ALIGNER_DISTANCE_FROM_CORNER,
-            y: DOCUMENT_HEIGHT-2.0*ALIGNER_OUTER_RADIUS-ALIGNER_DISTANCE_FROM_CORNER,
+            x: 1.0-2.0*ALIGNER_OUTER_RADIUS-ALIGNER_DISTANCE_FROM_CORNER,
+            y: 1.0-2.0*ALIGNER_OUTER_RADIUS-ALIGNER_DISTANCE_FROM_CORNER,
             kind: ElementKind::Aligner,
         });
         elements.add_element(Element { // bottom left
             x: ALIGNER_DISTANCE_FROM_CORNER,
-            y: DOCUMENT_HEIGHT-2.0*ALIGNER_OUTER_RADIUS-ALIGNER_DISTANCE_FROM_CORNER,
+            y: 1.0-2.0*ALIGNER_OUTER_RADIUS-ALIGNER_DISTANCE_FROM_CORNER,
             kind: ElementKind::Aligner,
         });
 
@@ -152,7 +158,7 @@ impl PageLayout {
         elements.to_svg()
     }
 
-    pub fn interpret_targets(&self, targets_found: &TargetsFound) -> Result<LayoutResult, LayoutResultError> {
+    pub fn interpret_targets(&self, targets_found: &BarsFound) -> Result<LayoutResult, LayoutResultError> {
         // avoid silently double counting bars, hard error instead
         let mut already_found = HashSet::new();
 
@@ -228,16 +234,12 @@ impl SevenSegmentDisplay {
         for _ in 0..digit_count {
             digits.push(SevenSegmentDigit::new(current_x, y, id_generator));
 
-            current_x += BAR_LENGTH+BAR_LENGTH+BAR_WIDTH;
+            // we want to space it out
+            current_x += BAR_WIDTH+BAR_LENGTH+BAR_WIDTH+DIGIT_GAP;
         }
 
         SevenSegmentDisplay { digits }
     }
-//
-//    fn top_left_coordinates(&self) -> (f64, f64) {
-//        let b = &self.digits[0].bars[0];
-//        (b.x, b.y)
-//    }
 
     fn elements_iter(&self) -> impl Iterator<Item=Element>+'_ {
         let mut digit_index = 0;
@@ -261,7 +263,7 @@ impl SevenSegmentDisplay {
         })
     }
 
-    fn as_number(&self, targets_found: &TargetsFound, already_found: &mut HashSet<BarId>) -> Result<u64, SevenSegmentError> {
+    fn as_number(&self, targets_found: &BarsFound, already_found: &mut HashSet<BarId>) -> Result<u64, SevenSegmentError> {
         // returns None if no segments are filled, or we have an invalid digit
         // we are looking at these digits from right to left
 
@@ -273,16 +275,14 @@ impl SevenSegmentDisplay {
 
         for digit in self.digits.iter().rev() {
             match digit.get_digit(targets_found, already_found) {
-                Ok(d) =>
-                    if has_seen_empty {
-                        return Err(SevenSegmentError::Empty); // this situation looks like: 5523_23 or something TODO: maybe a new error kind?
-                    } else {
-                        all_are_empty = false;
-                        sum += d*power_of_ten;
-                    },
+                Ok(_) if has_seen_empty => return Err(SevenSegmentError::Empty), // this situation looks like: 5523_23 or something
                 Err(SevenSegmentError::Empty) => has_seen_empty = true, // something like _23
                 Err(SevenSegmentError::Invalid(n)) => return Err(SevenSegmentError::Invalid(n)),
                 Err(SevenSegmentError::BarConflict) => return Err(SevenSegmentError::BarConflict),
+                Ok(d) => {
+                    all_are_empty = false;
+                    sum += d*power_of_ten;
+                },
             }
 
             power_of_ten *= 10;
@@ -314,7 +314,7 @@ impl SevenSegmentDigit {
         SevenSegmentDigit { bars }
     }
 
-    fn get_digit(&self, targets_found: &TargetsFound, already_found: &mut HashSet<BarId>) -> Result<u64, SevenSegmentError> {
+    fn get_digit(&self, targets_found: &BarsFound, already_found: &mut HashSet<BarId>) -> Result<u64, SevenSegmentError> {
         use SevenSegmentError::*;
         
         let mut bars_set = 0; // default value
@@ -369,18 +369,17 @@ impl Bar {
         (self.x + base/2.0, self.y + height/2.0)
     }
 
-    fn is_set(&self, targets_found: &TargetsFound, already_found: &mut HashSet<BarId>) -> Result<bool, BarConflictError> {
+    fn is_set(&self, targets_found: &BarsFound, already_found: &mut HashSet<BarId>) -> Result<bool, BarConflictError> {
 
         let (mean_x, mean_y) = self.mean_position();
 
-        for &(target_x, target_y) in targets_found.targets.iter() {
+        for &(target_x, target_y) in targets_found.bars.iter() {
             let distance = (target_x-mean_x).hypot(target_y-mean_y);
 
             if distance < BAR_DISTANCE_THRESHOLD {
                 if already_found.contains(&self.id) {
                     return Err(BarConflictError)
                 } else {
-                    dbg!(distance);
                     return Ok(true);
                 }
             } // else: this isn't even relavant to this target

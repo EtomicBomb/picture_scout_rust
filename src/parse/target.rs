@@ -1,40 +1,53 @@
 use crate::parse::image::Color;
+use crate::util::squareness;
 
 const ALIGNER_COLOR: Color = Color::red();
 const VERTICAL_BAR_COLOR: Color = Color::blue();
-const HORIZONTAL_BAR_COLOR: Color = Color::magenta();
+const HORIZONTAL_BAR_COLOR: Color = Color::cyan();
 const DEBUG_TARGET_COLOR: Color = Color::green();
 
-const ALIGNER_FULLNESS: f64 = 0.39;
-const BAR_FULLNESS: f64 = 0.84;
+const ALIGNER_FULLNESS: f64 = 0.4;
 const FULLNESS_TOLERANCE: f64 = 0.2;
-const TARGET_MIN_AREA: usize = 1000;
-const TARGET_MAX_AREA: usize = 100_000;
+const ALIGNER_SQUARE_TOLERANCE: f64 = 2.0;
 
+const MAX_SQUARENESS: f64 = 5.0;
+const NOISE_FULLNESS_THRESHOLD: f64 = 0.1; // this means less than one percent of the target is filled in
+const NOISE_IMAGE_FILLED_THRESHOLD: f64 = 0.0001;
 
-#[derive(Clone)]
+const BAR_TARGET_AREA: f64 = 0.0003;
+const BAR_TARGET_AREA_TOLERANCE: f64 = 0.0002;
+const BAR_SQUARENESS: f64 = 3.0;
+const BAR_SQUARENESS_TOLERANCE: f64 = 2.0;
+
+#[derive(Clone, Debug)]
 pub struct Target {
     kind: TargetKind,
-    pub top: usize,
-    pub bottom: usize,
-    pub right: usize,
-    pub left: usize,
-    pub pixels_filled: usize,
-    pub mean_x: usize,
-    pub mean_y: usize,
+    pub top: f64,
+    pub bottom: f64,
+    pub right: f64,
+    pub left: f64,
+    pub fraction_of_image_filled: f64, // total fraction of the image filled by the target
+    pub mean_x: f64,
+    pub mean_y: f64,
 }
 
 impl Target {
-    pub fn new(top: usize, bottom: usize, right: usize, left: usize, mean_x: usize, mean_y: usize, pixels_filled: usize) -> Option<Target> {
+    pub fn new(left: usize, right: usize, top: usize, bottom: usize, pixels_filled: usize, mean_x: usize, mean_y: usize, image_base: usize, image_height: usize) -> Option<Target> {
+        let kind = TargetKind::classify(left, right, top, bottom, pixels_filled, image_base, image_height)?;
+
+        let b = image_base as f64;
+        let h = image_height as f64;
+
+        // we need to convert our absolute coordinates into fractions
         Some(Target {
-            top,
-            bottom,
-            right,
-            left,
-            pixels_filled,
-            mean_x,
-            mean_y,
-            kind: TargetKind::classify(top, bottom, right, left, pixels_filled)?
+            kind,
+            top: top as f64 / h,
+            bottom: bottom as f64 / h,
+            right: right as f64 / b,
+            left: left as f64 / b,
+            fraction_of_image_filled: pixels_filled as f64 / (b*h),
+            mean_x: mean_x as f64 / b,
+            mean_y: mean_y as f64 / h,
         })
     }
 
@@ -46,8 +59,8 @@ impl Target {
         }
     }
 
-    pub fn mean_position(&self) -> (f64, f64) {
-        fn mean(a: usize, b: usize) -> f64 {
+    pub fn center_position(&self) -> (f64, f64) {
+        fn mean(a: f64, b: f64) -> f64 {
             (a as f64 + b as f64)/2.0
         }
 
@@ -67,7 +80,7 @@ impl Target {
 }
 
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum TargetKind {
     HorizontalBar,
     VerticalBar,
@@ -77,36 +90,41 @@ pub enum TargetKind {
 
 
 impl TargetKind {
-    fn classify(top: usize, bottom: usize, right: usize, left: usize, pixels_filled: usize) -> Option<TargetKind> {
-        if pixels_filled < TARGET_MIN_AREA || pixels_filled > TARGET_MAX_AREA {
-            return None;
+    fn classify(left: usize, right: usize, top: usize, bottom: usize, pixels_filled: usize, image_base: usize, image_height: usize) -> Option<TargetKind> {
+        let target_base = right - left +1;
+        let target_height = bottom - top +1;
+
+        let target_area = (target_base*target_height) as f64;
+        let target_area_fraction = target_area / (image_base*image_height) as f64;
+
+        let fraction_image_filled = pixels_filled as f64 / (image_base*image_height) as f64;
+
+        let squareness = squareness(target_base, target_height);
+        let fullness = pixels_filled as f64 / target_area;
+
+        let is_tall = target_height > target_base;
+
+        if fullness < NOISE_FULLNESS_THRESHOLD || fraction_image_filled < NOISE_IMAGE_FILLED_THRESHOLD || squareness > MAX_SQUARENESS {
+            return None; // this target isn't a real target, its just noise
         }
 
-
-        let width = (right - left + 1) as f64;
-        let height = (bottom - top + 1) as f64;
-        let fullness = pixels_filled as f64 / (width * height);
-
-
-        let is_bar = (BAR_FULLNESS - fullness).abs() < FULLNESS_TOLERANCE;
-        let is_aligner = (ALIGNER_FULLNESS - fullness).abs() < FULLNESS_TOLERANCE;
-
-        if is_aligner {
-            println!("alligner area: {} fullness: {}", pixels_filled, fullness);
-        }
+        let is_aligner = squareness < ALIGNER_SQUARE_TOLERANCE && (fullness-ALIGNER_FULLNESS).abs() < FULLNESS_TOLERANCE;
+        //let is_bar = (fullness-BAR_FULLNESS).abs() < FULLNESS_TOLERANCE;
+        let is_bar = (target_area_fraction-BAR_TARGET_AREA).abs() < BAR_TARGET_AREA_TOLERANCE
+            && (squareness-BAR_SQUARENESS).abs() < BAR_SQUARENESS_TOLERANCE;
 
         if is_bar {
-            println!("bar area {} fullness: {}", pixels_filled, fullness);
+            println!("bar fullness: {:.03}\t\tsquareness: {}\t\timage_filled: {}", fullness, squareness, fraction_image_filled);
         }
 
         match (is_bar, is_aligner) {
             (false, false) => {
-                println!("mystery fullness {}", fullness);
+                println!("mystery fullness: {:.03}\t\tsquareness: {}\t\ttarget_area: {}", fullness, squareness, target_area_fraction);
                 Some(TargetKind::Debug)
             },
             (true, true) => None,
             (false, true) => Some(TargetKind::Aligner),
-            (true, false) if height > width => Some(TargetKind::VerticalBar),
+            (true, false) if is_tall => Some(TargetKind::VerticalBar),
             (true, false) => Some(TargetKind::HorizontalBar),
         }
     }

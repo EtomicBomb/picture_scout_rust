@@ -7,7 +7,7 @@ pub struct BooleanMatrix {
 }
 
 impl BooleanMatrix {
-    pub fn width_height(&self) -> (usize, usize) {
+    pub fn base_height(&self) -> (usize, usize) {
         (self.width, self.height)
     }
 
@@ -29,10 +29,10 @@ impl BooleanMatrix {
 
     /// Produces a boolean matrix with true corresponding to a dark color, and false meaning light.
     pub fn from_image(image: &Image, dark_threshold: u8) -> BooleanMatrix {
-        let mut matrix = BooleanMatrix::all_false(image.width, image.height);
+        let mut matrix = BooleanMatrix::all_false(image.base, image.height);
 
         for y in 0..image.height {
-            for x in 0..image.width {
+            for x in 0..image.base {
                 let color = image.get_color(x, y);
 
                 if color.is_darker_than(dark_threshold) {

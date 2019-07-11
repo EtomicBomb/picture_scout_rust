@@ -4,53 +4,63 @@ use crate::parse::target_mesh::TargetMesh;
 
 mod boolean_matrix;
 pub mod image;
-mod perspective_transform;
 mod target;
 mod target_mesh;
 
-use perspective_transform::perspective_transform;
-use crate::util::map;
-use crate::make::scan_sheet_elements::{DOCUMENT_BASE, DOCUMENT_HEIGHT};
+use crate::make::scan_sheet_elements::{ALIGNER_OUTER_RADIUS};
+use crate::make::scan_sheet_layout::ALIGNER_DISTANCE_FROM_CORNER;
 
 const DARK_THRESHOLD: u8 = 110; // all pixels darker than this are target candidates
 
 #[derive(Debug)]
-pub struct TargetsFound {
-    pub targets: Vec<(f64, f64)>,
+pub struct BarsFound {
+    pub bars: Vec<(f64, f64)>,
 }
 
-impl TargetsFound {
-    pub fn from_image(input_image: &Image) -> TargetsFound {
+impl BarsFound {
+    pub fn from_image(input_image: &Image) -> BarsFound {
         let target_candidates = BooleanMatrix::from_image(&input_image, DARK_THRESHOLD);
 
-        let target_mesh = TargetMesh::from_matrix(&target_candidates);
-        let aligner_centers = target_mesh.get_aligner_centers();
+        target_candidates.as_image().output_to_file("bruh.png");
 
-        let transformed_image = perspective_transform(&input_image, &aligner_centers);
+        let mesh = TargetMesh::from_matrix(&target_candidates);
+        let mut debug_image = input_image.clone();
+        mesh.add_to_image(&mut debug_image);
+        debug_image.output_to_file("debug.png");
+        let mut aligner_centers = mesh.get_aligner_centers();
 
+
+
+
+        let d = ALIGNER_OUTER_RADIUS+ALIGNER_DISTANCE_FROM_CORNER;
+        let mut destination_centers = [(d, d), (1.0-d, d), (1.0-d, 1.0-d), (d, 1.0-d)];
+
+
+        dbg!();
+
+        let new_image_height = 500; // why not?
+        // we have to scale our transformation centers to the size of the new image
+        for (x, y) in aligner_centers.iter_mut() {
+            *x *= input_image.base as f64;
+            *y *= input_image.height as f64;
+        }
+        for (x, y) in destination_centers.iter_mut() {
+            *x *= new_image_height as f64;
+            *y *= new_image_height as f64;
+        }
+
+
+        let transformed_image = input_image.perspective_transform(&aligner_centers, &destination_centers, new_image_height, new_image_height);
+        transformed_image.output_to_file("transformed.png");
         let transformed_image_matrix = BooleanMatrix::from_image(&transformed_image, DARK_THRESHOLD);
 
         let new_target_mesh = TargetMesh::from_matrix(&transformed_image_matrix);
 
+        let mut output_image_2 = transformed_image.clone();
+        new_target_mesh.add_to_image(&mut output_image_2);
+        output_image_2.output_to_file("debug2.png");
 
-        // TODO: remove
-        let mut debug_image = transformed_image.clone();
-        new_target_mesh.add_to_image(&mut debug_image);
-        debug_image.output_to_file("debug.png");
-
-        let (width, height) = transformed_image_matrix.width_height();
-
-        let mut targets = Vec::new();
-        for target in new_target_mesh.targets.iter().filter(|t| t.is_bar()) {
-            let (mean_x, mean_y) = target.mean_position();
-
-            // this corodinates are in image space, not scan sheet coordinate space
-            let sheet_x = map(mean_x, 0.0, width as f64, 0.0, DOCUMENT_BASE);
-            let sheet_y = map(mean_y, 0.0, height as f64, 0.0, DOCUMENT_HEIGHT);
-            targets.push((sheet_x, sheet_y));
-        }
-
-        TargetsFound { targets }
+        BarsFound { bars: new_target_mesh.get_bar_centers() }
     }
 }
 

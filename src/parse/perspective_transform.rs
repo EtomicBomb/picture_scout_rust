@@ -1,27 +1,23 @@
 use rulinalg::matrix::Matrix;
 use rulinalg::vector::Vector;
 
-use std::f64::consts::SQRT_2;
-
-use crate::util::map;
 use crate::parse::image::{Image, Color};
 use crate::make::scan_sheet_elements::ALIGNER_OUTER_RADIUS;
 use crate::make::scan_sheet_layout::ALIGNER_DISTANCE_FROM_CORNER;
 
-pub fn perspective_transform(old: &Image, aligner_centers: &[(f64, f64)])-> Image {
+pub fn perspective_transform(old: &Image, aligner_centers: &[(f64, f64)], destination_centers: &[(f64, f64)], new_image_side: usize)-> Image {
     // https://www.pyimagesearch.com/2014/08/25/4-point-opencv-getperspective-transform-example/
     // https://docs.opencv.org/2.4/modules/imgproc/doc/geometric_transformations.html?highlight=getperspectivetransform#void%20warpPerspective(InputArray%20src,%20OutputArray%20dst,%20InputArray%20M,%20Size%20dsize,%20int%20flags,%20int%20borderMode,%20const%20Scalar&%20borderValue)
     // https://github.com/opencv/opencv/blob/11b020b9f9e111bddd40bffe3b1759aa02d966f0/modules/imgproc/src/imgwarp.cpp
 
-    let width = old.width as f64;
-    let height = width * SQRT_2;
 
     //let m = get_perspective_shift_matrix(aligner_centers, old.width as f64, old.height as f64);
-    let m = get_perspective_shift_matrix(aligner_centers, width, height);
+    //let m = get_perspective_shift_matrix(aligner_centers, width, height);
+    let m = get_perspective_shift_matrix(aligner_centers, destination_centers);
 
     // actually produce a new image with our transformation
     //Image::from_fn(old.width, old.height, |x: usize, y: usize| {
-    Image::from_fn(width as usize, height as usize, |x: usize, y: usize| {
+    Image::from_fn(new_image_side, new_image_side, |x: usize, y: usize| {
         let x = x as f64;
         let y = y as f64;
 
@@ -33,14 +29,12 @@ pub fn perspective_transform(old: &Image, aligner_centers: &[(f64, f64)])-> Imag
     })
 }
 
-fn get_perspective_shift_matrix(aligner_centers: &[(f64, f64)], width: f64, height: f64) -> Matrix<f64> {
+fn get_perspective_shift_matrix(aligner_centers: &[(f64, f64)], destination_centers: &[(f64, f64)]) -> Matrix<f64> {
     assert_eq!(aligner_centers.len(), 4);
 
     let src = aligner_centers; // rename
+    let dst = destination_centers; // rename
 
-    // TODO: should try to do encapsulation here
-    let d = map(ALIGNER_OUTER_RADIUS + ALIGNER_DISTANCE_FROM_CORNER, 0.0, 144.0, 0.0, height);
-    let dst = [(d, d), (width-d, d), (width-d, height-d), (d, height-d)];
 
     let mut a = Matrix::zeros(8, 8);
     let mut b = Vector::zeros(8);
